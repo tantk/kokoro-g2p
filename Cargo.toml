@@ -9,11 +9,25 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+default = ["english"]
+english = []
+chinese = ["dep:jieba-rs"]
+spanish = []
+indonesian = []
+turkish = []
+italian = []
+german = []
+portuguese = []
+korean = []
+vietnamese = []
+full = ["english", "chinese", "spanish", "indonesian", "turkish", "italian", "german", "portuguese", "korean", "vietnamese"]
 jni = ["dep:jni"]
+uniffi = ["dep:uniffi"]
 
 [dependencies]
 jni = { version = "0.21", optional = true }
+jieba-rs = { version = "0.7", optional = true }
+uniffi = { version = "0.28", optional = true }
 regex = "1.10"
 lazy_static = "1.5"
 serde = { version = "1.0", features = ["derive"] }

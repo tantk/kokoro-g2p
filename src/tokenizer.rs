@@ -149,6 +149,60 @@ static VOCAB: Lazy<HashMap<char, i64>> = Lazy::new(|| {
     // American reduced vowel
     m.insert('ᵻ', 177);  // between ə and ɪ
 
+    // =========================================================================
+    // Additional phonemes for Spanish, Indonesian, Turkish, Italian
+    // =========================================================================
+
+    // Close front rounded vowel (Turkish ü)
+    // Note: Using IPA 'y' at a new ID since lowercase 'y' is already used for letter y
+    m.insert('ʏ', 217);  // Near-close near-front rounded vowel (close to Turkish ü)
+
+    // =========================================================================
+    // Zhuyin (Bopomofo) characters for Chinese support
+    // These map to the Kokoro Chinese model vocabulary
+    // =========================================================================
+
+    // Zhuyin initials (consonants)
+    m.insert('ㄅ', 180);  // b
+    m.insert('ㄆ', 181);  // p
+    m.insert('ㄇ', 182);  // m
+    m.insert('ㄈ', 183);  // f
+    m.insert('ㄉ', 184);  // d
+    m.insert('ㄊ', 185);  // t
+    m.insert('ㄋ', 186);  // n
+    m.insert('ㄌ', 187);  // l
+    m.insert('ㄍ', 188);  // g
+    m.insert('ㄎ', 189);  // k
+    m.insert('ㄏ', 190);  // h
+    m.insert('ㄐ', 191);  // j
+    m.insert('ㄑ', 192);  // q
+    m.insert('ㄒ', 193);  // x
+    m.insert('ㄓ', 194);  // zh
+    m.insert('ㄔ', 195);  // ch
+    m.insert('ㄕ', 196);  // sh
+    m.insert('ㄖ', 197);  // r
+    m.insert('ㄗ', 198);  // z
+    m.insert('ㄘ', 199);  // c
+    m.insert('ㄙ', 200);  // s
+
+    // Zhuyin medials and finals (vowels)
+    m.insert('ㄧ', 201);  // i
+    m.insert('ㄨ', 202);  // u
+    m.insert('ㄩ', 203);  // ü
+    m.insert('ㄚ', 204);  // a
+    m.insert('ㄛ', 205);  // o
+    m.insert('ㄜ', 206);  // e
+    m.insert('ㄝ', 207);  // ê (for ie, üe)
+    m.insert('ㄞ', 208);  // ai
+    m.insert('ㄟ', 209);  // ei
+    m.insert('ㄠ', 210);  // ao
+    m.insert('ㄡ', 211);  // ou
+    m.insert('ㄢ', 212);  // an
+    m.insert('ㄣ', 213);  // en
+    m.insert('ㄤ', 214);  // ang
+    m.insert('ㄥ', 215);  // eng
+    m.insert('ㄦ', 216);  // er
+
     m
 });
 

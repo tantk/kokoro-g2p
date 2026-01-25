@@ -49,6 +49,11 @@ impl G2P {
         self.unk_marker = marker.to_string();
     }
 
+    /// Check if this G2P engine is configured for British English
+    pub fn is_british(&self) -> bool {
+        self.british
+    }
+
     /// Convert text to phoneme string
     pub fn text_to_phonemes(&self, text: &str) -> String {
         // Preprocess the text (numbers, abbreviations, etc.)
@@ -432,7 +437,7 @@ mod tests {
         assert!(!phonemes.contains("❓"));
 
         // CamelCase
-        let phonemes = g2p.text_to_phonemes("JavaScript");
+        let _phonemes = g2p.text_to_phonemes("JavaScript");
         // May contain unknown but parts should be recognized
     }
 

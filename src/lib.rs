@@ -1,14 +1,16 @@
 //! Kokoro G2P - Grapheme-to-Phoneme Engine for Kokoro TTS
 //!
-//! This library converts English text to phoneme token IDs suitable for
-//! the Kokoro-82M TTS model. It supports both American and British English.
+//! This library converts text to phoneme token IDs suitable for the Kokoro TTS models.
+//! It supports:
+//! - English (American and British)
+//! - Chinese (Mandarin, zh-CN) - requires `chinese` feature
 //!
 //! # Example
 //!
 //! ```rust
 //! use kokoro_g2p::{text_to_tokens, text_to_phonemes};
 //!
-//! // Convert text to token IDs for TTS model
+//! // Convert English text to token IDs
 //! let tokens = text_to_tokens("Hello, world!", "en-us");
 //! assert!(!tokens.is_empty());
 //!
@@ -16,15 +18,195 @@
 //! let phonemes = text_to_phonemes("Hello, world!", "en-us");
 //! println!("Phonemes: {}", phonemes);
 //! ```
+//!
+//! # Chinese Support
+//!
+//! Enable the `chinese` feature for Mandarin Chinese support:
+//!
+//! ```toml
+//! [dependencies]
+//! kokoro-g2p = { version = "0.1", features = ["chinese"] }
+//! ```
+//!
+//! ```rust,ignore
+//! use kokoro_g2p::{text_to_tokens, text_to_phonemes};
+//!
+//! // Convert Chinese text to tokens
+//! let tokens = text_to_tokens("你好世界", "zh");
+//! let phonemes = text_to_phonemes("你好世界", "zh");
+//! ```
 
+#[cfg(feature = "english")]
 pub mod g2p;
+#[cfg(feature = "english")]
 pub mod lexicon;
+#[cfg(feature = "english")]
 pub mod preprocessor;
+
 pub mod tokenizer;
 
+#[cfg(feature = "chinese")]
+pub mod zh;
+
+#[cfg(feature = "spanish")]
+pub mod es;
+
+#[cfg(feature = "indonesian")]
+pub mod id;
+
+#[cfg(feature = "turkish")]
+pub mod tr;
+
+#[cfg(feature = "italian")]
+pub mod it;
+
+#[cfg(feature = "german")]
+pub mod de;
+
+#[cfg(feature = "portuguese")]
+pub mod pt;
+
+#[cfg(feature = "korean")]
+pub mod ko;
+
+#[cfg(feature = "vietnamese")]
+pub mod vi;
+
+pub mod pipeline;
+
 // Re-export main functions
-pub use g2p::{text_to_tokens, text_to_phoneme_string as text_to_phonemes, G2P};
+#[cfg(feature = "english")]
+pub use g2p::{text_to_phoneme_string as text_to_phonemes_en, G2P};
 pub use tokenizer::{phonemes_to_tokens, tokens_to_phonemes, MAX_TOKENS, PAD_TOKEN};
+pub use pipeline::KPipeline;
+
+/// Convert text to token IDs with automatic language detection or explicit language
+///
+/// Supported language codes:
+/// - `"en"`, `"en-us"`, `"english"` - American English
+/// - `"en-gb"`, `"british"` - British English
+/// - `"zh"`, `"zh-cn"`, `"chinese"`, `"mandarin"` - Mandarin Chinese (requires `chinese` feature)
+/// - `"es"`, `"spanish"` - Spanish (requires `spanish` feature)
+/// - `"id"`, `"indonesian"` - Indonesian (requires `indonesian` feature)
+/// - `"tr"`, `"turkish"` - Turkish (requires `turkish` feature)
+/// - `"it"`, `"italian"` - Italian (requires `italian` feature)
+pub fn text_to_tokens(text: &str, language: &str) -> Vec<i64> {
+    let lang_lower = language.to_lowercase();
+
+    match lang_lower.as_str() {
+        #[cfg(feature = "chinese")]
+        "zh" | "zh-cn" | "chinese" | "mandarin" | "cmn" => {
+            zh::text_to_tokens(text)
+        }
+        #[cfg(feature = "spanish")]
+        "es" | "es-es" | "es-mx" | "spanish" | "español" => {
+            es::text_to_tokens(text)
+        }
+        #[cfg(feature = "indonesian")]
+        "id" | "indonesian" | "bahasa" => {
+            id::text_to_tokens(text)
+        }
+        #[cfg(feature = "turkish")]
+        "tr" | "turkish" | "türkçe" => {
+            tr::text_to_tokens(text)
+        }
+        #[cfg(feature = "italian")]
+        "it" | "italian" | "italiano" => {
+            it::text_to_tokens(text)
+        }
+        #[cfg(feature = "german")]
+        "de" | "german" | "deutsch" => {
+            de::text_to_tokens(text)
+        }
+        #[cfg(feature = "portuguese")]
+        "pt" | "pt-br" | "pt-pt" | "portuguese" | "português" => {
+            pt::text_to_tokens(text)
+        }
+        #[cfg(feature = "korean")]
+        "ko" | "korean" | "한국어" => {
+            ko::text_to_tokens(text)
+        }
+        #[cfg(feature = "vietnamese")]
+        "vi" | "vietnamese" | "tiếng việt" => {
+            vi::text_to_tokens(text)
+        }
+        #[cfg(feature = "english")]
+        _ => {
+            g2p::text_to_tokens(text, language)
+        }
+        #[cfg(not(feature = "english"))]
+        _ => {
+            log::warn!("Language '{}' not supported without 'english' feature", language);
+            vec![PAD_TOKEN, PAD_TOKEN]
+        }
+    }
+}
+
+/// Convert text to phoneme string with automatic language detection or explicit language
+///
+/// Supported language codes:
+/// - `"en"`, `"en-us"`, `"english"` - American English
+/// - `"en-gb"`, `"british"` - British English
+/// - `"zh"`, `"zh-cn"`, `"chinese"`, `"mandarin"` - Mandarin Chinese (requires `chinese` feature)
+/// - `"es"`, `"spanish"` - Spanish (requires `spanish` feature)
+/// - `"id"`, `"indonesian"` - Indonesian (requires `indonesian` feature)
+/// - `"tr"`, `"turkish"` - Turkish (requires `turkish` feature)
+/// - `"it"`, `"italian"` - Italian (requires `italian` feature)
+/// - `"de"`, `"german"` - German (requires `german` feature)
+/// - `"pt"`, `"portuguese"` - Portuguese (requires `portuguese` feature)
+/// - `"ko"`, `"korean"` - Korean (requires `korean` feature)
+/// - `"vi"`, `"vietnamese"` - Vietnamese (requires `vietnamese` feature)
+pub fn text_to_phonemes(text: &str, language: &str) -> String {
+    let lang_lower = language.to_lowercase();
+
+    match lang_lower.as_str() {
+        #[cfg(feature = "chinese")]
+        "zh" | "zh-cn" | "chinese" | "mandarin" | "cmn" => {
+            zh::text_to_phonemes(text)
+        }
+        #[cfg(feature = "spanish")]
+        "es" | "es-es" | "es-mx" | "spanish" | "español" => {
+            es::text_to_phonemes(text)
+        }
+        #[cfg(feature = "indonesian")]
+        "id" | "indonesian" | "bahasa" => {
+            id::text_to_phonemes(text)
+        }
+        #[cfg(feature = "turkish")]
+        "tr" | "turkish" | "türkçe" => {
+            tr::text_to_phonemes(text)
+        }
+        #[cfg(feature = "italian")]
+        "it" | "italian" | "italiano" => {
+            it::text_to_phonemes(text)
+        }
+        #[cfg(feature = "german")]
+        "de" | "german" | "deutsch" => {
+            de::text_to_phonemes(text)
+        }
+        #[cfg(feature = "portuguese")]
+        "pt" | "pt-br" | "pt-pt" | "portuguese" | "português" => {
+            pt::text_to_phonemes(text)
+        }
+        #[cfg(feature = "korean")]
+        "ko" | "korean" | "한국어" => {
+            ko::text_to_phonemes(text)
+        }
+        #[cfg(feature = "vietnamese")]
+        "vi" | "vietnamese" | "tiếng việt" => {
+            vi::text_to_phonemes(text)
+        }
+        #[cfg(feature = "english")]
+        _ => {
+            g2p::text_to_phoneme_string(text, language)
+        }
+        #[cfg(not(feature = "english"))]
+        _ => {
+            log::warn!("Language '{}' not supported without 'english' feature", language);
+            String::new()
+        }
+    }
+}
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -61,8 +243,8 @@ mod jni_interface {
             }
         };
 
-        // Perform tokenization
-        let tokens = crate::g2p::text_to_tokens(&text, "en-us");
+        // Perform tokenization using unified function
+        let tokens = crate::text_to_tokens(&text, "en-us");
 
         // Create and populate the output array
         let output = match env.new_long_array(tokens.len() as i32) {
@@ -100,7 +282,8 @@ mod jni_interface {
             Err(_) => "en-us".to_string(),
         };
 
-        let tokens = crate::g2p::text_to_tokens(&text, &language);
+        // Use unified function that supports multiple languages
+        let tokens = crate::text_to_tokens(&text, &language);
 
         let output = env.new_long_array(tokens.len() as i32).unwrap();
         env.set_long_array_region(&output, 0, &tokens).unwrap();
@@ -125,7 +308,8 @@ mod jni_interface {
             Err(_) => "en-us".to_string(),
         };
 
-        let phonemes = crate::g2p::text_to_phoneme_string(&text, &language);
+        // Use unified function that supports multiple languages
+        let phonemes = crate::text_to_phonemes(&text, &language);
 
         env.new_string(phonemes).unwrap()
     }
@@ -187,7 +371,8 @@ pub unsafe extern "C" fn kokoro_text_to_tokens(
         }
     };
 
-    let mut tokens = g2p::text_to_tokens(text, language);
+    // Use unified function that supports multiple languages
+    let mut tokens = text_to_tokens(text, language);
     let result = CTokenArray {
         data: tokens.as_mut_ptr(),
         len: tokens.len(),
@@ -241,7 +426,8 @@ pub unsafe extern "C" fn kokoro_text_to_phonemes(
         }
     };
 
-    let phonemes = g2p::text_to_phoneme_string(text, language);
+    // Use unified function that supports multiple languages
+    let phonemes = text_to_phonemes(text, language);
 
     match std::ffi::CString::new(phonemes) {
         Ok(s) => s.into_raw(),
@@ -279,6 +465,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_text_to_tokens() {
         let tokens = text_to_tokens("Hello, world!", "en-us");
         assert!(tokens.len() > 2);
@@ -287,6 +474,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_text_to_phonemes() {
         let phonemes = text_to_phonemes("Hello, world!", "en-us");
         assert!(!phonemes.is_empty());
@@ -294,6 +482,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_hello_world() {
         let tokens = text_to_tokens("Hello, world!", "en");
         assert!(tokens.len() > 0);
@@ -302,6 +491,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_numbers() {
         let tokens = text_to_tokens("I have 3 apples.", "en");
         // Should tokenize "three" not "3"
@@ -309,6 +499,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_max_length() {
         let long_text = "word ".repeat(200);
         let tokens = text_to_tokens(&long_text, "en");
@@ -316,6 +507,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_british_english() {
         let tokens_us = text_to_tokens("color", "en-us");
         let tokens_gb = text_to_tokens("colour", "en-gb");
@@ -325,6 +517,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "english")]
     fn test_roundtrip() {
         let text = "The quick brown fox jumps over the lazy dog.";
         let tokens = text_to_tokens(text, "en");
@@ -332,5 +525,221 @@ mod tests {
 
         assert!(!phonemes.is_empty());
         assert!(phonemes.chars().all(|c| c != '❓'));
+    }
+
+    // ========================================================================
+    // Chinese G2P Tests
+    // ========================================================================
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_text_to_tokens() {
+        let tokens = text_to_tokens("你好世界", "zh");
+        assert!(tokens.len() > 2);
+        assert_eq!(tokens[0], PAD_TOKEN);
+        assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_text_to_phonemes() {
+        let phonemes = text_to_phonemes("你好", "zh");
+        assert!(!phonemes.is_empty());
+        // Should contain Zhuyin characters
+        // Check for Zhuyin characters (both initials and finals)
+        assert!(phonemes.chars().any(|c| matches!(c, 'ㄅ'..='ㄦ')));
+        println!("Chinese phonemes: {}", phonemes);
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_ni_hao_sandhi() {
+        // 你好 should apply 3-3 tone sandhi
+        let phonemes = text_to_phonemes("你好", "zh");
+        // After sandhi, first syllable should have tone 2 marker (↗)
+        println!("你好 phonemes: {}", phonemes);
+        assert!(phonemes.contains('↗')); // Tone 2 marker for first syllable
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_yi_ge_sandhi() {
+        // 一个 should apply 一 sandhi: yi1 + ge4 → yi2 + ge4
+        let phonemes = text_to_phonemes("一个", "zh");
+        println!("一个 phonemes: {}", phonemes);
+        // Should have tone 2 marker for 一 before 4th tone
+        assert!(phonemes.contains('↗'));
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_bu_shi_sandhi() {
+        // 不是 should apply 不 sandhi: bu4 + shi4 → bu2 + shi4
+        let phonemes = text_to_phonemes("不是", "zh");
+        println!("不是 phonemes: {}", phonemes);
+        // Should have tone 2 marker for 不 before 4th tone
+        assert!(phonemes.contains('↗'));
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_polyphone_xing() {
+        // 行走 (xíng zǒu) vs 银行 (yín háng)
+        let phonemes1 = text_to_phonemes("行走", "zh");
+        let phonemes2 = text_to_phonemes("银行", "zh");
+        println!("行走 phonemes: {}", phonemes1);
+        println!("银行 phonemes: {}", phonemes2);
+        // They should be different
+        assert_ne!(phonemes1, phonemes2);
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_currency_sgd() {
+        // S$100 → 新加坡元一百
+        let phonemes = text_to_phonemes("S$100", "zh");
+        println!("S$100 phonemes: {}", phonemes);
+        // Should have converted to Chinese spoken form
+        assert!(!phonemes.is_empty());
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_language_codes() {
+        // Test various Chinese language codes
+        let tokens_zh = text_to_tokens("你好", "zh");
+        let tokens_zh_cn = text_to_tokens("你好", "zh-cn");
+        let tokens_chinese = text_to_tokens("你好", "chinese");
+        let tokens_mandarin = text_to_tokens("你好", "mandarin");
+
+        // All should produce the same result
+        assert_eq!(tokens_zh, tokens_zh_cn);
+        assert_eq!(tokens_zh, tokens_chinese);
+        assert_eq!(tokens_zh, tokens_mandarin);
+    }
+
+    #[test]
+    #[cfg(feature = "chinese")]
+    fn test_chinese_pipeline() {
+        let mut pipeline = KPipeline::new("zh");
+        let result = pipeline.process("你好世界");
+        assert!(!result.phonemes.is_empty());
+        assert!(result.tokens.len() > 2);
+    }
+
+    // ========================================================================
+    // Spanish G2P Tests
+    // ========================================================================
+
+    #[test]
+    #[cfg(feature = "spanish")]
+    fn test_spanish_text_to_tokens() {
+        let tokens = text_to_tokens("hola mundo", "es");
+        assert!(tokens.len() > 2);
+        assert_eq!(tokens[0], PAD_TOKEN);
+        assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
+    }
+
+    #[test]
+    #[cfg(feature = "spanish")]
+    fn test_spanish_text_to_phonemes() {
+        let phonemes = text_to_phonemes("hola mundo", "es");
+        assert!(!phonemes.is_empty());
+        println!("Spanish phonemes: {}", phonemes);
+    }
+
+    #[test]
+    #[cfg(feature = "spanish")]
+    fn test_spanish_language_codes() {
+        let tokens_es = text_to_tokens("hola", "es");
+        let tokens_spanish = text_to_tokens("hola", "spanish");
+        assert_eq!(tokens_es, tokens_spanish);
+    }
+
+    // ========================================================================
+    // Indonesian G2P Tests
+    // ========================================================================
+
+    #[test]
+    #[cfg(feature = "indonesian")]
+    fn test_indonesian_text_to_tokens() {
+        let tokens = text_to_tokens("selamat pagi", "id");
+        assert!(tokens.len() > 2);
+        assert_eq!(tokens[0], PAD_TOKEN);
+        assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
+    }
+
+    #[test]
+    #[cfg(feature = "indonesian")]
+    fn test_indonesian_text_to_phonemes() {
+        let phonemes = text_to_phonemes("selamat pagi", "id");
+        assert!(!phonemes.is_empty());
+        println!("Indonesian phonemes: {}", phonemes);
+    }
+
+    #[test]
+    #[cfg(feature = "indonesian")]
+    fn test_indonesian_language_codes() {
+        let tokens_id = text_to_tokens("halo", "id");
+        let tokens_indonesian = text_to_tokens("halo", "indonesian");
+        assert_eq!(tokens_id, tokens_indonesian);
+    }
+
+    // ========================================================================
+    // Turkish G2P Tests
+    // ========================================================================
+
+    #[test]
+    #[cfg(feature = "turkish")]
+    fn test_turkish_text_to_tokens() {
+        let tokens = text_to_tokens("merhaba", "tr");
+        assert!(tokens.len() > 2);
+        assert_eq!(tokens[0], PAD_TOKEN);
+        assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
+    }
+
+    #[test]
+    #[cfg(feature = "turkish")]
+    fn test_turkish_text_to_phonemes() {
+        let phonemes = text_to_phonemes("merhaba dünya", "tr");
+        assert!(!phonemes.is_empty());
+        println!("Turkish phonemes: {}", phonemes);
+    }
+
+    #[test]
+    #[cfg(feature = "turkish")]
+    fn test_turkish_language_codes() {
+        let tokens_tr = text_to_tokens("merhaba", "tr");
+        let tokens_turkish = text_to_tokens("merhaba", "turkish");
+        assert_eq!(tokens_tr, tokens_turkish);
+    }
+
+    // ========================================================================
+    // Italian G2P Tests
+    // ========================================================================
+
+    #[test]
+    #[cfg(feature = "italian")]
+    fn test_italian_text_to_tokens() {
+        let tokens = text_to_tokens("ciao mondo", "it");
+        assert!(tokens.len() > 2);
+        assert_eq!(tokens[0], PAD_TOKEN);
+        assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
+    }
+
+    #[test]
+    #[cfg(feature = "italian")]
+    fn test_italian_text_to_phonemes() {
+        let phonemes = text_to_phonemes("ciao mondo", "it");
+        assert!(!phonemes.is_empty());
+        println!("Italian phonemes: {}", phonemes);
+    }
+
+    #[test]
+    #[cfg(feature = "italian")]
+    fn test_italian_language_codes() {
+        let tokens_it = text_to_tokens("ciao", "it");
+        let tokens_italian = text_to_tokens("ciao", "italian");
+        assert_eq!(tokens_it, tokens_italian);
     }
 }

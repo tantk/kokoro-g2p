@@ -392,8 +392,18 @@ impl Lexicon {
 
 /// Check if word ends with doubled consonant before -ing
 fn is_doubled_consonant(word: &str) -> bool {
-    let re = regex::Regex::new(r"([bcdgklmnprstvxz])\1ing$|cking$").unwrap();
-    re.is_match(word)
+    if word.ends_with("cking") {
+        return true;
+    }
+    if !word.ends_with("ing") || word.len() < 5 {
+        return false;
+    }
+    let chars: Vec<char> = word.chars().collect();
+    let len = chars.len();
+    // Check if the two chars before "ing" are the same consonant
+    let c1 = chars[len - 5];
+    let c2 = chars[len - 4];
+    c1 == c2 && matches!(c1, 'b' | 'c' | 'd' | 'g' | 'k' | 'l' | 'm' | 'n' | 'p' | 'r' | 's' | 't' | 'v' | 'x' | 'z')
 }
 
 /// Reference-based lexicon (more memory efficient)
