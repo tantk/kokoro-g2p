@@ -239,7 +239,7 @@ mod jni_interface {
                 log::error!("Failed to get string from JNI: {}", e);
                 let output = env.new_long_array(2).unwrap();
                 env.set_long_array_region(&output, 0, &[0, 0]).unwrap();
-                return output;
+                return output.into_raw();
             }
         };
 
@@ -253,7 +253,7 @@ mod jni_interface {
                 log::error!("Failed to create output array: {}", e);
                 let output = env.new_long_array(2).unwrap();
                 env.set_long_array_region(&output, 0, &[0, 0]).unwrap();
-                return output;
+                return output.into_raw();
             }
         };
 
@@ -261,7 +261,7 @@ mod jni_interface {
             log::error!("Failed to set array region: {}", e);
         }
 
-        output
+        output.into_raw()
     }
 
     /// JNI entry point for tokenization with language parameter
@@ -287,7 +287,7 @@ mod jni_interface {
 
         let output = env.new_long_array(tokens.len() as i32).unwrap();
         env.set_long_array_region(&output, 0, &tokens).unwrap();
-        output
+        output.into_raw()
     }
 
     /// JNI entry point for getting phoneme string (useful for debugging)
