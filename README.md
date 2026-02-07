@@ -1,28 +1,27 @@
 # Kokoro G2P
 
-A high-performance Rust library for Grapheme-to-Phoneme (G2P) conversion, designed for the Kokoro TTS model. Supports **10 languages** with optimized phoneme tokenization.
+A high-performance Rust library for Grapheme-to-Phoneme (G2P) conversion, designed for the Kokoro TTS model. Supports **11 languages** with optimized phoneme tokenization.
 
 ## Supported Languages
 
-| Language | Code | Feature Flag | Accuracy |
-|----------|------|--------------|----------|
-| English (US) | `en-us` | `english` | 80% |
-| English (UK) | `en-gb` | `english` | 80% |
-| Spanish | `es` | `spanish` | 78% |
-| Italian | `it` | `italian` | 49% |
-| Indonesian | `id` | `indonesian` | 36% |
-| Turkish | `tr` | `turkish` | 20% |
-| Portuguese | `pt` | `portuguese` | 16% |
-| German | `de` | `german` | 6% |
-| Chinese | `zh` | `chinese` | - |
-| Korean | `ko` | `korean` | - |
-| Vietnamese | `vi` | `vietnamese` | - |
-
-*Accuracy measured against WikiPron pronunciation dictionary. Lower scores for some languages are due to IPA notation differences, not pronunciation errors.*
+| Language | Code | Feature Flag | Implementation |
+|----------|------|--------------|----------------|
+| English (US) | `en-us` | `english` | Dictionary (100K+ words) + rules |
+| English (UK) | `en-gb` | `english` | Dictionary (100K+ words) + rules |
+| Chinese | `zh` | `chinese` | Jieba segmentation + pinyin + tone sandhi |
+| Japanese | `ja` | `japanese` | Kanji reading dictionary + kana to IPA |
+| Spanish | `es` | `spanish` | Rule-based |
+| German | `de` | `german` | Rule-based |
+| Portuguese | `pt` | `portuguese` | Rule-based (Brazilian) |
+| Korean | `ko` | `korean` | Hangul decomposition + phonological rules |
+| Vietnamese | `vi` | `vietnamese` | Rule-based + 6-tone detection |
+| Indonesian | `id` | `indonesian` | Rule-based |
+| Turkish | `tr` | `turkish` | Rule-based |
+| Italian | `it` | `italian` | Rule-based |
 
 ## Features
 
-- **Multi-language G2P** - 10 languages with unified API
+- **Multi-language G2P** - 11 languages with unified API
 - **Dictionary + Rules** - Hybrid approach for best accuracy
 - **Text Normalization** - Numbers, currency, dates, abbreviations
 - **Lazy Loading** - Language engines initialized on demand
@@ -212,9 +211,18 @@ cargo test --features english --test validation test_validate_english_common -- 
 - Tone sandhi rules (3-3, 一, 不)
 - Polyphone disambiguation
 
+### Japanese
+- Requires `japanese` feature
+- Kanji reading dictionary + kana to IPA
+- Hiragana/Katakana phoneme mapping
+
 ### Spanish/Italian
 - Near-phonetic orthography
-- High accuracy rule-based conversion
+- Rule-based conversion
+
+### German
+- Umlauts, ich/ach-Laut, final devoicing
+- Rule-based (schwa reduction and R-vocalization planned)
 
 ### Korean
 - Hangul decomposition into jamo
@@ -239,7 +247,7 @@ cargo test --features english --test validation test_validate_english_common -- 
 |--------------|------|
 | English only | ~14MB |
 | Single language | ~5MB |
-| Full (10 languages) | ~20MB |
+| Full (11 languages) | ~20MB |
 
 ## License
 
