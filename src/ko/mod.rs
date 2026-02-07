@@ -158,7 +158,7 @@ fn is_nasal_initial(initial: u32) -> bool {
 fn nasalize_final(final_c: u32) -> u32 {
     match final_c {
         1 | 2 | 3 | 4 | 5 | 6 => 4,  // ㄱ,ㄲ,ㄳ,ㄴ,ㄵ,ㄶ → ㄴ (4)
-        7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 => 16, // ㄷ group → ㅁ is wrong, should be ㄴ
+        7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 => 4,  // ㄷ group → ㄴ (nasalization)
         16 | 17 | 18 | 19 | 20 | 21 | 22 => 21, // ㅂ group → ㅁ (21)
         _ => final_c,
     }

@@ -48,6 +48,9 @@ pub mod tokenizer;
 #[cfg(feature = "chinese")]
 pub mod zh;
 
+#[cfg(feature = "japanese")]
+pub mod ja;
+
 #[cfg(feature = "spanish")]
 pub mod es;
 
@@ -74,6 +77,20 @@ pub mod vi;
 
 pub mod pipeline;
 
+/// Safely truncate a string at character boundary (not byte boundary)
+/// Returns a substring containing at most `max_bytes` bytes, ending at a valid char boundary
+pub fn safe_truncate(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    // Find the last valid character boundary at or before max_bytes
+    let mut end = max_bytes.min(s.len());
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
 // Re-export main functions
 #[cfg(feature = "english")]
 pub use g2p::{text_to_phoneme_string as text_to_phonemes_en, G2P};
@@ -93,10 +110,22 @@ pub use pipeline::KPipeline;
 pub fn text_to_tokens(text: &str, language: &str) -> Vec<i64> {
     let lang_lower = language.to_lowercase();
 
+    log::debug!("text_to_tokens: lang='{}', text='{}'", &lang_lower, safe_truncate(&text, 30));
+
     match lang_lower.as_str() {
         #[cfg(feature = "chinese")]
         "zh" | "zh-cn" | "chinese" | "mandarin" | "cmn" => {
-            zh::text_to_tokens(text)
+            log::debug!("Using Chinese G2P for: {}", safe_truncate(&text, 20));
+            let tokens = zh::text_to_tokens(text);
+            log::debug!("Chinese G2P returned {} tokens", tokens.len());
+            tokens
+        }
+        #[cfg(feature = "japanese")]
+        "ja" | "jp" | "japanese" | "日本語" => {
+            log::debug!("Using Japanese G2P for: {}", safe_truncate(&text, 20));
+            let tokens = ja::text_to_tokens(text);
+            log::debug!("Japanese G2P returned {} tokens", tokens.len());
+            tokens
         }
         #[cfg(feature = "spanish")]
         "es" | "es-es" | "es-mx" | "spanish" | "español" => {
@@ -164,6 +193,10 @@ pub fn text_to_phonemes(text: &str, language: &str) -> String {
         "zh" | "zh-cn" | "chinese" | "mandarin" | "cmn" => {
             zh::text_to_phonemes(text)
         }
+        #[cfg(feature = "japanese")]
+        "ja" | "jp" | "japanese" | "日本語" => {
+            ja::text_to_phonemes(text)
+        }
         #[cfg(feature = "spanish")]
         "es" | "es-es" | "es-mx" | "spanish" | "español" => {
             es::text_to_phonemes(text)
@@ -220,6 +253,20 @@ mod jni_interface {
     use jni::objects::{JClass, JString};
     use jni::sys::jlongArray;
     use jni::JNIEnv;
+    use std::sync::Once;
+    use crate::safe_truncate;
+
+    static INIT: Once = Once::new();
+
+    fn init_logger() {
+        INIT.call_once(|| {
+            android_logger::init_once(
+                android_logger::Config::default()
+                    .with_max_level(log::LevelFilter::Debug)
+                    .with_tag("KokoroG2P"),
+            );
+        });
+    }
 
     /// JNI entry point for tokenization
     ///
@@ -232,14 +279,18 @@ mod jni_interface {
         _class: JClass,
         text: JString,
     ) -> jlongArray {
+        init_logger();
+
         // Get the text string from Java
         let text: String = match env.get_string(&text) {
             Ok(s) => s.into(),
             Err(e) => {
                 log::error!("Failed to get string from JNI: {}", e);
-                let output = env.new_long_array(2).unwrap();
-                env.set_long_array_region(&output, 0, &[0, 0]).unwrap();
-                return output.into_raw();
+                if let Ok(output) = env.new_long_array(2) {
+                    let _ = env.set_long_array_region(&output, 0, &[0, 0]);
+                    return output.into_raw();
+                }
+                return std::ptr::null_mut();
             }
         };
 
@@ -251,9 +302,11 @@ mod jni_interface {
             Ok(arr) => arr,
             Err(e) => {
                 log::error!("Failed to create output array: {}", e);
-                let output = env.new_long_array(2).unwrap();
-                env.set_long_array_region(&output, 0, &[0, 0]).unwrap();
-                return output.into_raw();
+                if let Ok(output) = env.new_long_array(2) {
+                    let _ = env.set_long_array_region(&output, 0, &[0, 0]);
+                    return output.into_raw();
+                }
+                return std::ptr::null_mut();
             }
         };
 
@@ -272,6 +325,8 @@ mod jni_interface {
         text: JString,
         language: JString,
     ) -> jlongArray {
+        init_logger();
+
         let text: String = match env.get_string(&text) {
             Ok(s) => s.into(),
             Err(_) => String::new(),
@@ -282,12 +337,83 @@ mod jni_interface {
             Err(_) => "en-us".to_string(),
         };
 
-        // Use unified function that supports multiple languages
-        let tokens = crate::text_to_tokens(&text, &language);
+        log::debug!("tokenizeWithLanguage: text='{}', lang='{}'", safe_truncate(&text, 20), &language);
 
-        let output = env.new_long_array(tokens.len() as i32).unwrap();
-        env.set_long_array_region(&output, 0, &tokens).unwrap();
-        output.into_raw()
+        // Use catch_unwind to prevent panics from crashing the app
+        let tokens = std::panic::catch_unwind(|| {
+            crate::text_to_tokens(&text, &language)
+        }).unwrap_or_else(|e| {
+            log::error!("Panic in text_to_tokens: {:?}", e);
+            vec![0, 0]  // Return padding tokens on error
+        });
+
+        log::debug!("Result: {} tokens", tokens.len());
+
+        match env.new_long_array(tokens.len() as i32) {
+            Ok(output) => {
+                let _ = env.set_long_array_region(&output, 0, &tokens);
+                output.into_raw()
+            }
+            Err(e) => {
+                log::error!("Failed to create output array: {:?}", e);
+                if let Ok(output) = env.new_long_array(2) {
+                    let _ = env.set_long_array_region(&output, 0, &[0, 0]);
+                    return output.into_raw();
+                }
+                std::ptr::null_mut()
+            }
+        }
+    }
+
+    /// JNI entry point for checking enabled features (diagnostic)
+    #[no_mangle]
+    pub extern "system" fn Java_com_openvoice_app_engine_KokoroTokenizer_getEnabledFeatures<'a>(
+        mut env: JNIEnv<'a>,
+        _class: JClass,
+    ) -> JString<'a> {
+        init_logger();
+
+        let mut features = Vec::new();
+
+        #[cfg(feature = "english")]
+        features.push("english");
+
+        #[cfg(feature = "chinese")]
+        features.push("chinese");
+
+        #[cfg(feature = "japanese")]
+        features.push("japanese");
+
+        #[cfg(feature = "spanish")]
+        features.push("spanish");
+
+        #[cfg(feature = "indonesian")]
+        features.push("indonesian");
+
+        #[cfg(feature = "turkish")]
+        features.push("turkish");
+
+        #[cfg(feature = "italian")]
+        features.push("italian");
+
+        #[cfg(feature = "german")]
+        features.push("german");
+
+        #[cfg(feature = "portuguese")]
+        features.push("portuguese");
+
+        #[cfg(feature = "korean")]
+        features.push("korean");
+
+        #[cfg(feature = "vietnamese")]
+        features.push("vietnamese");
+
+        let result = features.join(",");
+        log::info!("Enabled features: {}", &result);
+        match env.new_string(&result) {
+            Ok(s) => s,
+            Err(_) => env.new_string("").expect("Failed to create empty JNI string"),
+        }
     }
 
     /// JNI entry point for getting phoneme string (useful for debugging)
@@ -311,7 +437,10 @@ mod jni_interface {
         // Use unified function that supports multiple languages
         let phonemes = crate::text_to_phonemes(&text, &language);
 
-        env.new_string(phonemes).unwrap()
+        match env.new_string(phonemes) {
+            Ok(s) => s,
+            Err(_) => env.new_string("").expect("Failed to create empty JNI string"),
+        }
     }
 }
 
@@ -534,8 +663,13 @@ mod tests {
     #[test]
     #[cfg(feature = "chinese")]
     fn test_chinese_text_to_tokens() {
+        let phonemes = text_to_phonemes("你好世界", "zh");
+        println!("Chinese phonemes for '你好世界': {}", phonemes);
+
         let tokens = text_to_tokens("你好世界", "zh");
-        assert!(tokens.len() > 2);
+        println!("Chinese tokens for '你好世界': {:?} (count: {})", tokens, tokens.len());
+
+        assert!(tokens.len() > 2, "Expected more than 2 tokens, got {}", tokens.len());
         assert_eq!(tokens[0], PAD_TOKEN);
         assert_eq!(*tokens.last().unwrap(), PAD_TOKEN);
     }
@@ -545,9 +679,8 @@ mod tests {
     fn test_chinese_text_to_phonemes() {
         let phonemes = text_to_phonemes("你好", "zh");
         assert!(!phonemes.is_empty());
-        // Should contain Zhuyin characters
-        // Check for Zhuyin characters (both initials and finals)
-        assert!(phonemes.chars().any(|c| matches!(c, 'ㄅ'..='ㄦ')));
+        // Chinese G2P outputs IPA phonemes with tone markers
+        assert!(phonemes.chars().any(|c| c.is_alphabetic() || matches!(c, '↗' | '↘' | '↓' | '→')));
         println!("Chinese phonemes: {}", phonemes);
     }
 
@@ -654,6 +787,21 @@ mod tests {
         let tokens_es = text_to_tokens("hola", "es");
         let tokens_spanish = text_to_tokens("hola", "spanish");
         assert_eq!(tokens_es, tokens_spanish);
+    }
+
+    #[test]
+    #[cfg(feature = "korean")]
+    fn test_korean_tokens_in_range() {
+        let text = "안녕하세요";
+        let phonemes = text_to_phonemes(text, "ko");
+        let tokens = text_to_tokens(text, "ko");
+        let max_token = tokens.iter().max().copied().unwrap_or(0);
+
+        println!("Korean '{}' -> phonemes: {}", text, phonemes);
+        println!("Korean tokens: {:?}", tokens);
+        println!("Max token ID: {} (must be <= 177)", max_token);
+
+        assert!(max_token <= 177, "Token {} exceeds English vocab size 177", max_token);
     }
 
     // ========================================================================

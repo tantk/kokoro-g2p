@@ -339,7 +339,7 @@ pub fn preprocess(text: &str) -> String {
     // Handle currency and numbers
     result = NUMBER_PATTERN
         .replace_all(&result, |caps: &regex::Captures| {
-            let currency = caps.get(1).map(|m| m.as_str().chars().next().unwrap());
+            let currency = caps.get(1).and_then(|m| m.as_str().chars().next());
             let num_str = &caps[2];
             let suffix = caps.get(3).map(|m| m.as_str());
 
@@ -378,8 +378,9 @@ pub fn preprocess(text: &str) -> String {
             } else {
                 // Decimal number
                 let whole = num.floor() as i64;
-                let frac = num.fract().to_string();
-                let frac_digits: String = frac.chars().skip(2).collect(); // Skip "0."
+                let frac_str = format!("{:.10}", num.fract());
+                let frac_digits = frac_str.trim_start_matches("0.").trim_end_matches('0');
+                let frac_digits = if frac_digits.is_empty() { "0" } else { frac_digits };
 
                 let mut result = number_to_words(whole);
                 result.push_str(" point");
@@ -449,7 +450,7 @@ pub fn tokenize(text: &str) -> Vec<Token> {
         }
 
         let word = m.as_str();
-        let is_punct = word.len() == 1 && !word.chars().next().unwrap().is_alphanumeric();
+        let is_punct = word.len() == 1 && word.chars().next().map_or(false, |c| !c.is_alphanumeric());
 
         let token = if is_punct {
             Token::new(word).as_punct()

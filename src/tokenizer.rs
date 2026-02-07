@@ -241,7 +241,7 @@ pub fn phonemes_to_tokens(phonemes: &str) -> Vec<i64> {
     tokens.push(PAD_TOKEN); // End padding
 
     // Truncate if exceeding max length
-    if tokens.len() > MAX_TOKENS + 2 {
+    if tokens.len() >= MAX_TOKENS + 2 {
         tokens.truncate(MAX_TOKENS + 1);
         tokens.push(PAD_TOKEN);
     }

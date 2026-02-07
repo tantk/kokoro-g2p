@@ -11,6 +11,9 @@ use crate::g2p::G2P;
 #[cfg(feature = "chinese")]
 use crate::zh::ChineseG2P;
 
+#[cfg(feature = "japanese")]
+use crate::ja::JapaneseG2P;
+
 #[cfg(feature = "spanish")]
 use crate::es::SpanishG2P;
 
@@ -53,6 +56,8 @@ pub enum Language {
     EnglishGB,
     /// Mandarin Chinese
     Chinese,
+    /// Japanese
+    Japanese,
     /// Spanish
     Spanish,
     /// Indonesian
@@ -78,6 +83,7 @@ impl Language {
         match lower.as_str() {
             "en-gb" | "british" | "gb" => Language::EnglishGB,
             "zh" | "zh-cn" | "chinese" | "mandarin" | "cmn" => Language::Chinese,
+            "ja" | "jp" | "japanese" | "日本語" => Language::Japanese,
             "es" | "es-es" | "es-mx" | "spanish" | "español" => Language::Spanish,
             "id" | "indonesian" | "bahasa" => Language::Indonesian,
             "tr" | "turkish" | "türkçe" => Language::Turkish,
@@ -96,6 +102,7 @@ impl Language {
             Language::EnglishUS => "en-us",
             Language::EnglishGB => "en-gb",
             Language::Chinese => "zh",
+            Language::Japanese => "ja",
             Language::Spanish => "es",
             Language::Indonesian => "id",
             Language::Turkish => "tr",
@@ -117,6 +124,8 @@ pub struct KPipeline {
     english_g2p: Option<G2P>,
     #[cfg(feature = "chinese")]
     chinese_g2p: Option<ChineseG2P>,
+    #[cfg(feature = "japanese")]
+    japanese_g2p: Option<JapaneseG2P>,
     #[cfg(feature = "spanish")]
     spanish_g2p: Option<SpanishG2P>,
     #[cfg(feature = "indonesian")]
@@ -145,6 +154,8 @@ impl KPipeline {
             english_g2p: None,
             #[cfg(feature = "chinese")]
             chinese_g2p: None,
+            #[cfg(feature = "japanese")]
+            japanese_g2p: None,
             #[cfg(feature = "spanish")]
             spanish_g2p: None,
             #[cfg(feature = "indonesian")]
@@ -321,6 +332,24 @@ impl KPipeline {
             #[cfg(not(feature = "korean"))]
             Language::Korean => {
                 log::warn!("Korean language requested but 'korean' feature not enabled");
+                G2PResult {
+                    phonemes: String::new(),
+                    tokens: vec![tokenizer::PAD_TOKEN, tokenizer::PAD_TOKEN],
+                }
+            }
+            #[cfg(feature = "japanese")]
+            Language::Japanese => {
+                if self.japanese_g2p.is_none() {
+                    self.japanese_g2p = Some(JapaneseG2P::new());
+                }
+                let g2p = self.japanese_g2p.as_ref().unwrap();
+                let phonemes = g2p.text_to_phonemes(text);
+                let tokens = tokenizer::phonemes_to_tokens(&phonemes);
+                G2PResult { phonemes, tokens }
+            }
+            #[cfg(not(feature = "japanese"))]
+            Language::Japanese => {
+                log::warn!("Japanese language requested but 'japanese' feature not enabled");
                 G2PResult {
                     phonemes: String::new(),
                     tokens: vec![tokenizer::PAD_TOKEN, tokenizer::PAD_TOKEN],

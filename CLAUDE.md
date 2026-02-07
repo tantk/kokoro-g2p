@@ -24,8 +24,9 @@ Rust G2P (Grapheme-to-Phoneme) library for Kokoro TTS model. Converts text to ph
 
 ### Language-Specific
 - [jieba-rs](https://crates.io/crates/jieba-rs) - Chinese word segmentation (used for zh)
-- [mecab](https://crates.io/crates/mecab) - Japanese morphological analysis
-- [lindera](https://crates.io/crates/lindera) - Japanese/Korean/Chinese tokenizer
+- [pinyin](https://crates.io/crates/pinyin) - Pinyin conversion fallback (used for zh)
+- [mecab](https://crates.io/crates/mecab) - Japanese morphological analysis (reference, not currently used)
+- [lindera](https://crates.io/crates/lindera) - Japanese/Korean/Chinese tokenizer (reference, not currently used)
 
 ## Architecture
 
@@ -38,7 +39,22 @@ src/
 ├── lexicon.rs       # Dictionary lookup with stemming
 ├── preprocessor.rs  # English text normalization
 ├── zh/              # Chinese module (jieba segmentation + pinyin)
+│   ├── mod.rs
+│   ├── normalizer.rs
+│   ├── phoneme_mapper.rs  # Pinyin to IPA/Zhuyin mapping
+│   ├── pinyin.rs          # Hanzi to Pinyin conversion
+│   ├── tone_sandhi.rs     # Tone sandhi rules (3-3, 一, 不)
+│   ├── polyphone.rs       # Polyphonic character resolution
+│   └── segmenter.rs       # Jieba word segmentation wrapper
+├── ja/              # Japanese module (kanji reading + kana to IPA)
+│   ├── mod.rs
+│   ├── phoneme_map.rs     # Kana to phoneme mapping
+│   └── reading.rs         # Kanji reading dictionary
 ├── es/              # Spanish module (rule-based)
+├── de/              # German module (rule-based)
+├── pt/              # Portuguese module (rule-based)
+├── ko/              # Korean module (Hangul-based)
+├── vi/              # Vietnamese module (rule-based)
 ├── id/              # Indonesian module (rule-based)
 ├── tr/              # Turkish module (rule-based)
 └── it/              # Italian module (rule-based)
@@ -50,12 +66,19 @@ src/
 [features]
 default = ["english"]
 english = []
-chinese = ["dep:jieba-rs"]  # Only add deps when needed
+chinese = ["english", "dep:jieba-rs", "dep:pinyin"]  # Bilingual with English
+japanese = ["english"]                                 # With English support
 spanish = []
 indonesian = []
 turkish = []
 italian = []
-full = ["english", "chinese", "spanish", "indonesian", "turkish", "italian"]
+german = []
+portuguese = []
+korean = []
+vietnamese = []
+full = ["english", "chinese", "japanese", "spanish", "indonesian", "turkish", "italian", "german", "portuguese", "korean", "vietnamese"]
+jni = ["dep:jni"]       # Android JNI interface
+uniffi = ["dep:uniffi"]  # Alternative FFI
 ```
 
 Use `#[cfg(feature = "langname")]` for conditional compilation:
@@ -122,7 +145,7 @@ pub mod ln;
 
 ## G2P Implementation Patterns
 
-### Rule-based (Easy languages: Spanish, Indonesian, Turkish, Italian)
+### Rule-based (Spanish, Indonesian, Turkish, Italian, German, Portuguese, Korean, Vietnamese)
 ```rust
 fn word_to_phonemes(word: &str) -> String {
     let chars: Vec<char> = word.to_lowercase().chars().collect();
@@ -209,12 +232,14 @@ pub fn number_to_{lang}(n: u64) -> String {
 IPA phonemes mapped to token IDs (0-255 range). Key ranges:
 - 0: PAD token
 - 1-17: Punctuation
-- 18-42: Special symbols
+- 18-42: Special symbols & diphthongs (including Japanese clusters)
 - 43-68: Lowercase letters (a-z)
 - 69-160: IPA vowels and consonants
 - 156-158: Stress markers (ˈ, ˌ, ː)
-- 180-216: Zhuyin (Chinese)
-- 217+: Additional phonemes
+- 169-173: Intonation markers (↓, →, ↗, ↘)
+- 177: Reduced vowel (ᵻ)
+- 180-216: Zhuyin/Bopomofo (Chinese)
+- 217+: Additional phonemes (e.g., Turkish ʏ)
 
 Add new phonemes in tokenizer.rs VOCAB map:
 ```rust
@@ -269,24 +294,25 @@ cargo test --features full
 ls -lh target/release/libkokoro_g2p.so
 ```
 
-## Language Difficulty Tiers
+## Implemented Languages (11)
 
-### Easy (Rule-based, ~500 lines each)
-- Spanish, Indonesian, Turkish, Italian
-- Near-phonetic orthography
-- No external dependencies
+### Complex with Dependencies
+- **English** - Dictionary-based (gold → silver → stemming → fallback rules), ~14K lines
+- **Chinese** - Jieba segmentation + pinyin + tone sandhi + Zhuyin mapping, ~2.5K lines, includes embedded English G2P for bilingual text
+- **Japanese** - Kanji reading dictionary + kana to IPA, ~1.1K lines
 
-### Medium (Dictionary + Rules, ~1000 lines)
-- German, Portuguese, Korean, Vietnamese
-- Need stress dictionaries or morphological rules
-- May need optional dependencies
+### Rule-based (~200-400 lines each)
+- **Spanish**, **German**, **Portuguese**, **Korean**, **Vietnamese**, **Indonesian**, **Turkish**, **Italian**
+- Near-phonetic orthography, no external dependencies
+
+## Not Yet Implemented (for reference)
 
 ### Hard (ML/Complex processing)
 - Hindi (schwa deletion), Russian (stress), French (liaison)
 - Need large dictionaries or statistical models
 
 ### Very Hard (Preprocessing required)
-- Arabic (diacritization), Japanese (kanji), Thai (segmentation)
+- Arabic (diacritization), Thai (segmentation)
 - Need separate ML models before G2P
 
 ## Common IPA Symbols

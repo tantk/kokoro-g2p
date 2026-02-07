@@ -258,12 +258,12 @@ fn detect_tone(chars: &[char]) -> Tone {
 
 fn tone_to_marker(tone: Tone) -> &'static str {
     match tone {
-        Tone::Ngang => "→",  // Level
-        Tone::Huyen => "↘",  // Falling
-        Tone::Sac => "↗",    // Rising
-        Tone::Hoi => "↓",    // Dipping (down then up, simplified)
-        Tone::Nga => "↗",    // Rising with glottal (simplified to rising)
-        Tone::Nang => "↘",   // Low falling
+        Tone::Ngang => "→",   // Level
+        Tone::Huyen => "↘",   // Falling
+        Tone::Sac => "↗",     // Rising
+        Tone::Hoi => "↓",     // Dipping (down then up)
+        Tone::Nga => "↗ʔ",    // Rising with glottal stop
+        Tone::Nang => "↘ʔ",   // Low falling with glottal stop
     }
 }
 

@@ -202,7 +202,7 @@ impl G2P {
         }
 
         // Handle 's, 're, 've, 'll, 'd suffixes dynamically
-        if word.ends_with("'s") || word.ends_with("'s") {
+        if word.ends_with("'s") || word.ends_with("\u{2019}s") {
             let base = &word[..word.len() - 2];
             if let Some((base_phonemes, _)) = self.lexicon.get_word(base, None) {
                 let last = base_phonemes.chars().last().unwrap_or(' ');
